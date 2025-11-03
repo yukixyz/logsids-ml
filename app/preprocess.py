@@ -1,7 +1,11 @@
-import pandas as pd, re
+import pandas as pd
+import re
 from datetime import datetime
+from typing import Optional
+
 COMMON_LOG_RE = re.compile(r'(?P<ip>\S+) \S+ \S+ \[(?P<time>.*?)\] "(?P<req>.*?)" (?P<status>\d{3}) (?P<size>\d+|-) "(?P<ref>.*?)" "(?P<ua>.*?)"')
-def parse_common_log_line(line):
+
+def parse_common_log_line(line: str) -> Optional[dict]:
     m = COMMON_LOG_RE.match(line)
     if not m:
         return None
@@ -13,13 +17,14 @@ def parse_common_log_line(line):
         timestamp = None
     req = m.group('req')
     try:
-        method, path, proto = req.split(' ')
+        method, path, _ = req.split(' ')
     except Exception:
         method, path = 'GET', '/'
     status = int(m.group('status'))
     ua = m.group('ua')
     return {'timestamp': timestamp, 'source_ip': ip, 'method': method, 'path': path, 'status': status, 'user_agent': ua}
-def read_csv(path, gzip=False):
+
+def read_csv(path: str, gzip: bool=False) -> pd.DataFrame:
     df = pd.read_csv(path, compression='gzip' if gzip else None)
     if 'timestamp' in df.columns:
         df['timestamp'] = pd.to_datetime(df['timestamp'], errors='coerce')
@@ -31,7 +36,8 @@ def read_csv(path, gzip=False):
             raise ValueError(f"CSV missing column {c}")
     df['status'] = pd.to_numeric(df['status'], errors='coerce').fillna(0).astype(int)
     return df
-def detect_and_parse(path):
+
+def detect_and_parse(path: str) -> pd.DataFrame:
     try:
         return read_csv(path)
     except Exception:
@@ -46,7 +52,8 @@ def detect_and_parse(path):
             df['timestamp'] = pd.to_datetime(df['timestamp'], errors='coerce')
             return df
         raise ValueError("Unsupported log format")
-def is_private_ip(ip):
+
+def is_private_ip(ip: str) -> bool:
     try:
         a,b = ip.split('.')[:2]
         a,b = int(a), int(b)
@@ -56,14 +63,16 @@ def is_private_ip(ip):
     except Exception:
         return False
     return False
-def categorize_ua(ua):
+
+def categorize_ua(ua: str) -> str:
     s = str(ua).lower()
-    if 'bot' in s or 'crawl' in s or 'spider' in s or 'sqlmap' in s or 'nikto' in s:
+    if any(x in s for x in ('bot','crawl','spider','sqlmap','nikto','nikto')):
         return 'bot'
-    if 'mozilla' in s or 'chrome' in s or 'safari' in s or 'edge' in s:
+    if any(x in s for x in ('mozilla','chrome','safari','edge')):
         return 'browser'
     return 'other'
-def extract_features(df):
+
+def extract_features(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
     df['timestamp'] = pd.to_datetime(df['timestamp'], errors='coerce')
     df = df.dropna(subset=['timestamp'])
