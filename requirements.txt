@@ -1,0 +1,13 @@
+fastapi
+uvicorn[standard]
+pandas
+scikit-learn
+joblib
+python-multipart
+matplotlib
+weasyprint
+pytest
+python-dotenv
+pydantic
+requests
+aiofiles
